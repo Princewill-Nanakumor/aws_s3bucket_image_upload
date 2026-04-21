@@ -67,7 +67,7 @@ export default function UploadDropzone({
             width={160}
             height={160}
             unoptimized
-            className="mb-4 max-h-40 w-auto rounded-lg object-contain transition-transform duration-300 ease-out"
+            className="mb-4 h-auto max-h-40 w-auto rounded-lg object-contain transition-transform duration-300 ease-out"
           />
         ) : file ? (
           <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-lg bg-gray-100 text-gray-500">

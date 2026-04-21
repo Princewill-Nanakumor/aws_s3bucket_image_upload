@@ -4,8 +4,13 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import StatusMessage from "@/components/StatusMessage";
 import UploadDropzone from "@/components/UploadDropzone";
 import UploadedImagesGrid from "@/components/UploadedImagesGrid";
+import ConfirmDeleteModal from "@/components/ConfirmDeleteModal";
+import Toast from "@/components/Toast";
+import ImagePreviewModal from "@/components/ImagePreviewModal";
 
 export default function S3UploadCard() {
+  type UploadedImage = { key: string; url: string };
+  const PAGE_SIZE = 12;
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -13,7 +18,15 @@ export default function S3UploadCard() {
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error" | "">("");
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [images, setImages] = useState<string[]>([]);
+  const [images, setImages] = useState<UploadedImage[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMoreImages, setHasMoreImages] = useState(false);
+  const [isLoadingMoreImages, setIsLoadingMoreImages] = useState(false);
+  const [deletingKey, setDeletingKey] = useState<string | null>(null);
+  const [confirmDeleteKey, setConfirmDeleteKey] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState("");
+  const [toastType, setToastType] = useState<"success" | "error">("success");
+  const [previewImageIndex, setPreviewImageIndex] = useState<number | null>(null);
 
   const getFileUrlForKey = useCallback(async (key: string) => {
     const fileUrlRes = await fetch("/api/file-url", {
@@ -54,12 +67,25 @@ export default function S3UploadCard() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const fetchImages = useCallback(async () => {
-    setImagesLoading(true);
+  const fetchImages = useCallback(async (cursor?: string | null) => {
+    const isInitialLoad = !cursor;
+    if (isInitialLoad) {
+      setImagesLoading(true);
+    } else {
+      setIsLoadingMoreImages(true);
+    }
+
     try {
-      const res = await fetch("/api/files");
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
+      if (cursor) {
+        params.set("cursor", cursor);
+      }
+
+      const res = await fetch(`/api/files?${params.toString()}`);
       if (!res.ok) {
-        setImages([]);
+        if (isInitialLoad) setImages([]);
+        setHasMoreImages(false);
+        setNextCursor(null);
         return;
       }
 
@@ -70,19 +96,39 @@ export default function S3UploadCard() {
           )
         : [];
 
-      const urls = await Promise.all(
+      const files = await Promise.all(
         keys.map(async (key: string) => {
-          return getFileUrlForKey(key);
+          const url = await getFileUrlForKey(key);
+          return url ? { key, url } : null;
         }),
       );
+      const mappedFiles = files.filter(
+        (item): item is UploadedImage => Boolean(item),
+      );
 
-      setImages(urls.filter((url): url is string => Boolean(url)));
+      setImages((prev) => {
+        const base = isInitialLoad ? [] : prev;
+        const next = [...base];
+        for (const file of mappedFiles) {
+          if (!next.some((image) => image.key === file.key)) {
+            next.push(file);
+          }
+        }
+        return next;
+      });
+      setNextCursor(typeof data.nextCursor === "string" ? data.nextCursor : null);
+      setHasMoreImages(Boolean(data.hasMore));
     } catch {
-      setImages([]);
+      if (isInitialLoad) setImages([]);
+      setHasMoreImages(false);
     } finally {
-      setImagesLoading(false);
+      if (isInitialLoad) {
+        setImagesLoading(false);
+      } else {
+        setIsLoadingMoreImages(false);
+      }
     }
-  }, [getFileUrlForKey]);
+  }, [PAGE_SIZE, getFileUrlForKey]);
 
   useEffect(() => {
     fetchImages();
@@ -98,6 +144,17 @@ export default function S3UploadCard() {
 
     return () => window.clearTimeout(timeoutId);
   }, [message]);
+
+  useEffect(() => {
+    if (!toastMessage) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setToastMessage("");
+      setToastType("success");
+    }, 2500);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [toastMessage]);
 
   const handleRemove = () => {
     setFile(null);
@@ -149,8 +206,8 @@ export default function S3UploadCard() {
         const uploadedUrl = await getFileUrlForKey(uploadedKey);
         if (uploadedUrl) {
           setImages((prev) => [
-            uploadedUrl,
-            ...prev.filter((url) => url !== uploadedUrl),
+            { key: uploadedKey, url: uploadedUrl },
+            ...prev.filter((image) => image.key !== uploadedKey),
           ]);
           return;
         }
@@ -164,6 +221,80 @@ export default function S3UploadCard() {
       setLoading(false);
     }
   };
+
+  const handleDelete = async (key: string) => {
+    setDeletingKey(key);
+    try {
+      const res = await fetch("/api/delete", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key }),
+      });
+
+      if (!res.ok) {
+        setToastType("error");
+        setToastMessage("Delete failed");
+        return;
+      }
+
+      setImages((prev) => prev.filter((image) => image.key !== key));
+      setToastType("success");
+      setToastMessage("Image deleted successfully");
+    } catch {
+      setToastType("error");
+      setToastMessage("Delete failed");
+    } finally {
+      setDeletingKey(null);
+    }
+  };
+
+  const handleRequestDelete = (key: string) => {
+    setConfirmDeleteKey(key);
+  };
+
+  const handleCloseDeleteModal = () => {
+    if (deletingKey) return;
+    setConfirmDeleteKey(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!confirmDeleteKey) return;
+    await handleDelete(confirmDeleteKey);
+    setConfirmDeleteKey(null);
+  };
+
+  const handlePreviewImage = (index: number) => {
+    setPreviewImageIndex(index);
+  };
+
+  const handleLoadMoreImages = () => {
+    if (!hasMoreImages || !nextCursor || isLoadingMoreImages) return;
+    fetchImages(nextCursor);
+  };
+
+  const handleCloseImagePreview = () => {
+    setPreviewImageIndex(null);
+  };
+
+  const handlePreviewPrev = () => {
+    setPreviewImageIndex((prev) => {
+      if (prev === null || prev <= 0) return prev;
+      return prev - 1;
+    });
+  };
+
+  const handlePreviewNext = () => {
+    setPreviewImageIndex((prev) => {
+      if (prev === null || prev >= images.length - 1) return prev;
+      return prev + 1;
+    });
+  };
+
+  const previewImageUrl =
+    previewImageIndex !== null ? images[previewImageIndex]?.url || "" : "";
+  const canGoPrev = previewImageIndex !== null && previewImageIndex > 0;
+  const canGoNext =
+    previewImageIndex !== null && previewImageIndex < images.length - 1;
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-linear-to-br from-slate-100 via-blue-50 to-indigo-100 p-4 md:p-8 flex items-center justify-center">
@@ -197,7 +328,36 @@ export default function S3UploadCard() {
           <StatusMessage message={message} type={messageType} />
         </section>
 
-        <UploadedImagesGrid images={images} isLoading={imagesLoading} />
+        <UploadedImagesGrid
+          images={images}
+          isLoading={imagesLoading}
+          isLoadingMore={isLoadingMoreImages}
+          hasMore={hasMoreImages}
+          deletingKey={deletingKey}
+          onRequestDelete={handleRequestDelete}
+          onPreviewImage={handlePreviewImage}
+          onLoadMore={handleLoadMoreImages}
+        />
+        <ConfirmDeleteModal
+          isOpen={Boolean(confirmDeleteKey)}
+          isDeleting={Boolean(deletingKey)}
+          onClose={handleCloseDeleteModal}
+          onConfirm={handleConfirmDelete}
+        />
+        <ImagePreviewModal
+          isOpen={previewImageIndex !== null}
+          imageUrl={previewImageUrl}
+          canGoPrev={canGoPrev}
+          canGoNext={canGoNext}
+          onPrev={handlePreviewPrev}
+          onNext={handlePreviewNext}
+          onClose={handleCloseImagePreview}
+        />
+        <Toast
+          message={toastMessage}
+          isVisible={Boolean(toastMessage)}
+          type={toastType}
+        />
       </div>
     </main>
   );
