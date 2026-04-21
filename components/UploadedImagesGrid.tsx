@@ -17,10 +17,12 @@ type UploadedImagesGridProps = {
 function GridImageTile({
   imageUrl,
   index,
+  isPriority,
   onPreviewImage,
 }: {
   imageUrl: string;
   index: number;
+  isPriority: boolean;
   onPreviewImage: (index: number) => void;
 }) {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -42,7 +44,8 @@ function GridImageTile({
         alt="Uploaded file"
         fill
         unoptimized
-        loading={index === 0 ? "eager" : "lazy"}
+        loading={isPriority ? "eager" : "lazy"}
+        fetchPriority={isPriority ? "high" : "auto"}
         sizes="(max-width: 768px) 50vw, (max-width: 1024px) 170px, 220px"
         onLoad={() => setIsLoaded(true)}
         className={`object-cover transition-opacity duration-300 ${
@@ -66,9 +69,9 @@ export default function UploadedImagesGrid({
   const shouldShowScrollHint = !isLoading && images.length > 6;
 
   return (
-    <aside className="bg-linear-to-br from-white/90 via-blue-50/75 to-indigo-50/75 backdrop-blur-md shadow-xl rounded-3xl border border-white/70 p-6 w-full md:w-90 lg:w-115 relative">
-      <div className="pointer-events-none absolute inset-0 rounded-3xl border-2 border-transparent bg-linear-to-r from-fuchsia-200/70 via-sky-200/70 to-indigo-200/70 opacity-70 [mask:linear-gradient(#fff_0_0)_padding-box,linear-gradient(#fff_0_0)] mask-exclude [-webkit-mask:linear-gradient(#fff_0_0)_padding-box,linear-gradient(#fff_0_0)] [-webkit-mask-composite:xor]" />
-      <div className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-indigo-200/40" />
+    <aside className="bg-linear-to-br from-white/88 via-blue-200/82 to-indigo-200/82 backdrop-blur-md shadow-xl rounded-3xl border border-indigo-200/85 p-6 w-full md:w-90 lg:w-115 relative">
+      <div className="pointer-events-none absolute inset-0 rounded-3xl border-2 border-transparent bg-linear-to-r from-fuchsia-400/70 via-sky-400/70 to-indigo-400/70 opacity-70 [mask:linear-gradient(#fff_0_0)_padding-box,linear-gradient(#fff_0_0)] mask-exclude [-webkit-mask:linear-gradient(#fff_0_0)_padding-box,linear-gradient(#fff_0_0)] [-webkit-mask-composite:xor]" />
+      <div className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-indigo-400/50" />
       <div className="mb-4 flex items-center justify-between">
         <h2 className="font-display text-2xl font-semibold text-left text-slate-800">
           Uploaded Images
@@ -103,6 +106,7 @@ export default function UploadedImagesGrid({
                 <GridImageTile
                   imageUrl={image.url}
                   index={index}
+                  isPriority={index < 4}
                   onPreviewImage={onPreviewImage}
                 />
                 <button

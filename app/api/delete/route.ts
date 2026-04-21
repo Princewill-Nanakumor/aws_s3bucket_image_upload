@@ -5,7 +5,7 @@ export async function DELETE(req: Request) {
   try {
     const { key } = await req.json();
 
-    if (!key || typeof key !== "string") {
+    if (!key || typeof key !== "string" || !key.startsWith("uploads/")) {
       return Response.json({ error: "Invalid file key" }, { status: 400 });
     }
 
@@ -17,7 +17,8 @@ export async function DELETE(req: Request) {
     await s3.send(command);
 
     return Response.json({ message: "File deleted successfully" });
-  } catch {
+  } catch (err) {
+    console.error("Failed to delete file", err);
     return Response.json({ error: "Delete failed" }, { status: 500 });
   }
 }

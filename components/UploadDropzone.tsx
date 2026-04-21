@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { RefObject } from "react";
 
 type UploadDropzoneProps = {
@@ -61,12 +60,10 @@ export default function UploadDropzone({
         )}
 
         {preview && file?.type.startsWith("image/") ? (
-          <Image
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
             src={preview}
             alt="Preview"
-            width={160}
-            height={160}
-            unoptimized
             className="mb-4 h-auto max-h-40 w-auto rounded-lg object-contain transition-transform duration-300 ease-out"
           />
         ) : file ? (
