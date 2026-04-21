@@ -30,3 +30,23 @@ body {
   font-family: var(--font-playfair-display), Georgia, serif;
   letter-spacing: 0.01em;
 }
+
+@keyframes shimmer-rtl {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.shimmer-rtl {
+  background: linear-gradient(
+    90deg,
+    rgba(226, 232, 240, 0.95) 20%,
+    rgba(241, 245, 249, 1) 50%,
+    rgba(226, 232, 240, 0.95) 80%
+  );
+  background-size: 250% 100%;
+  animation: shimmer-rtl 2.2s linear infinite;
+}

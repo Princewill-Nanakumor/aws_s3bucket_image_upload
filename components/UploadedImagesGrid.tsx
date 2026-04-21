@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useState } from "react";
 
 type UploadedImagesGridProps = {
   images: { key: string; url: string }[];
@@ -12,6 +13,45 @@ type UploadedImagesGridProps = {
   onPreviewImage: (index: number) => void;
   onLoadMore: () => void;
 };
+
+function GridImageTile({
+  imageUrl,
+  index,
+  onPreviewImage,
+}: {
+  imageUrl: string;
+  index: number;
+  onPreviewImage: (index: number) => void;
+}) {
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  return (
+    <button
+      type="button"
+      onClick={() => onPreviewImage(index)}
+      aria-label="Open full image preview"
+      className="absolute inset-0 cursor-zoom-in"
+    >
+      <div
+        className={`shimmer-rtl absolute inset-0 transition-opacity duration-300 ${
+          isLoaded ? "opacity-0" : "opacity-100"
+        }`}
+      />
+      <Image
+        src={imageUrl}
+        alt="Uploaded file"
+        fill
+        unoptimized
+        loading={index === 0 ? "eager" : "lazy"}
+        sizes="(max-width: 768px) 50vw, (max-width: 1024px) 170px, 220px"
+        onLoad={() => setIsLoaded(true)}
+        className={`object-cover transition-opacity duration-300 ${
+          isLoaded ? "opacity-100" : "opacity-0"
+        }`}
+      />
+    </button>
+  );
+}
 
 export default function UploadedImagesGrid({
   images,
@@ -49,7 +89,7 @@ export default function UploadedImagesGrid({
             {[0, 1, 2, 3, 4, 5].map((item) => (
               <div
                 key={item}
-                className="h-28 md:h-32 lg:h-40 w-full rounded-lg bg-gray-200 animate-pulse"
+                className="shimmer-rtl h-28 md:h-32 lg:h-40 w-full rounded-lg"
               />
             ))}
           </div>
@@ -60,22 +100,11 @@ export default function UploadedImagesGrid({
                 key={image.key}
                 className="group relative h-28 md:h-32 lg:h-40 w-full overflow-hidden rounded-lg"
               >
-                <button
-                  type="button"
-                  onClick={() => onPreviewImage(index)}
-                  aria-label="Open full image preview"
-                  className="absolute inset-0 cursor-zoom-in"
-                >
-                  <Image
-                    src={image.url}
-                    alt="Uploaded file"
-                    fill
-                    unoptimized
-                    loading={index === 0 ? "eager" : "lazy"}
-                    sizes="(max-width: 768px) 50vw, (max-width: 1024px) 170px, 220px"
-                    className="object-cover"
-                  />
-                </button>
+                <GridImageTile
+                  imageUrl={image.url}
+                  index={index}
+                  onPreviewImage={onPreviewImage}
+                />
                 <button
                   type="button"
                   onClick={() => onRequestDelete(image.key)}

@@ -28,19 +28,6 @@ export default function S3UploadCard() {
   const [toastType, setToastType] = useState<"success" | "error">("success");
   const [previewImageIndex, setPreviewImageIndex] = useState<number | null>(null);
 
-  const getFileUrlForKey = useCallback(async (key: string) => {
-    const fileUrlRes = await fetch("/api/file-url", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key }),
-    });
-
-    if (!fileUrlRes.ok) return null;
-
-    const fileUrlData = await fileUrlRes.json();
-    return typeof fileUrlData.url === "string" ? fileUrlData.url : null;
-  }, []);
-
   useEffect(() => {
     if (!file) {
       setPreview(null);
@@ -90,21 +77,15 @@ export default function S3UploadCard() {
       }
 
       const data = await res.json();
-      const keys = Array.isArray(data.files)
+      const mappedFiles = Array.isArray(data.files)
         ? data.files.filter(
-            (key: unknown): key is string => typeof key === "string",
+            (item: unknown): item is UploadedImage =>
+              typeof item === "object" &&
+              item !== null &&
+              typeof (item as { key?: unknown }).key === "string" &&
+              typeof (item as { url?: unknown }).url === "string",
           )
         : [];
-
-      const files = await Promise.all(
-        keys.map(async (key: string) => {
-          const url = await getFileUrlForKey(key);
-          return url ? { key, url } : null;
-        }),
-      );
-      const mappedFiles = files.filter(
-        (item): item is UploadedImage => Boolean(item),
-      );
 
       setImages((prev) => {
         const base = isInitialLoad ? [] : prev;
@@ -128,7 +109,7 @@ export default function S3UploadCard() {
         setIsLoadingMoreImages(false);
       }
     }
-  }, [PAGE_SIZE, getFileUrlForKey]);
+  }, [PAGE_SIZE]);
 
   useEffect(() => {
     fetchImages();
@@ -202,17 +183,7 @@ export default function S3UploadCard() {
       if (fileInputRef.current) fileInputRef.current.value = "";
 
       const uploadedKey = typeof data.key === "string" ? data.key : null;
-      if (uploadedKey) {
-        const uploadedUrl = await getFileUrlForKey(uploadedKey);
-        if (uploadedUrl) {
-          setImages((prev) => [
-            { key: uploadedKey, url: uploadedUrl },
-            ...prev.filter((image) => image.key !== uploadedKey),
-          ]);
-          return;
-        }
-      }
-
+      if (uploadedKey) setHasMoreImages(true);
       fetchImages();
     } catch {
       setMessage("Upload failed");

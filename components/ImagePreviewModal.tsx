@@ -17,18 +17,30 @@ function PreviewImage({ imageUrl }: { imageUrl: string }) {
   const [isImageVisible, setIsImageVisible] = useState(false);
 
   return (
-    <Image
-      src={imageUrl}
-      alt="Full size preview"
-      fill
-      unoptimized
-      onLoad={() => setIsImageVisible(true)}
-      className={`object-contain transition-opacity duration-300 ease-in-out ${
-        isImageVisible ? "opacity-100" : "opacity-0"
-      }`}
-      sizes="100vw"
-      priority
-    />
+    <>
+      <div
+        className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${
+          isImageVisible ? "opacity-0 pointer-events-none" : "opacity-100"
+        }`}
+      >
+        <div className="shimmer-rtl h-full w-full opacity-70" />
+        <span className="absolute rounded-full bg-black/50 px-3 py-1 text-xs font-medium text-white">
+          Loading image...
+        </span>
+      </div>
+      <Image
+        src={imageUrl}
+        alt="Full size preview"
+        fill
+        unoptimized
+        onLoad={() => setIsImageVisible(true)}
+        className={`object-contain transition-opacity duration-300 ease-in-out ${
+          isImageVisible ? "opacity-100" : "opacity-0"
+        }`}
+        sizes="100vw"
+        priority
+      />
+    </>
   );
 }
 
