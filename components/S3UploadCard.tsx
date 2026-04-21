@@ -7,6 +7,10 @@ import UploadedImagesGrid from "@/components/UploadedImagesGrid";
 import ConfirmDeleteModal from "@/components/ConfirmDeleteModal";
 import Toast from "@/components/Toast";
 import ImagePreviewModal from "@/components/ImagePreviewModal";
+import {
+  MAX_FILE_SIZE_BYTES,
+  isAllowedImageUpload,
+} from "@/lib/uploads/validation";
 
 export default function S3UploadCard() {
   type UploadedImage = { key: string; url: string };
@@ -27,6 +31,7 @@ export default function S3UploadCard() {
   const [toastMessage, setToastMessage] = useState("");
   const [toastType, setToastType] = useState<"success" | "error">("success");
   const [previewImageIndex, setPreviewImageIndex] = useState<number | null>(null);
+  const fetchImagesRequestIdRef = useRef(0);
 
   useEffect(() => {
     if (!file) {
@@ -55,6 +60,7 @@ export default function S3UploadCard() {
   }, []);
 
   const fetchImages = useCallback(async (cursor?: string | null) => {
+    const requestId = ++fetchImagesRequestIdRef.current;
     const isInitialLoad = !cursor;
     if (isInitialLoad) {
       setImagesLoading(true);
@@ -77,6 +83,7 @@ export default function S3UploadCard() {
       }
 
       const data = await res.json();
+      if (requestId !== fetchImagesRequestIdRef.current) return;
       const mappedFiles = Array.isArray(data.files)
         ? data.files.filter(
             (item: unknown): item is UploadedImage =>
@@ -101,9 +108,11 @@ export default function S3UploadCard() {
       setHasMoreImages(Boolean(data.hasMore));
     } catch (err) {
       console.error("Failed to fetch images", err);
+      if (requestId !== fetchImagesRequestIdRef.current) return;
       if (isInitialLoad) setImages([]);
       setHasMoreImages(false);
     } finally {
+      if (requestId !== fetchImagesRequestIdRef.current) return;
       if (isInitialLoad) {
         setImagesLoading(false);
       } else {
@@ -152,8 +161,13 @@ export default function S3UploadCard() {
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > MAX_FILE_SIZE_BYTES) {
       setMessage("File must be under 5MB");
+      setMessageType("error");
+      return;
+    }
+    if (!isAllowedImageUpload(file.name, file.type)) {
+      setMessage("Only jpg, png, webp, gif, avif allowed");
       setMessageType("error");
       return;
     }
@@ -162,17 +176,23 @@ export default function S3UploadCard() {
     setMessage("");
     setMessageType("");
 
-    const uploadViaServerFallback = async (key: string) => {
+    const uploadViaServerFallback = async (key?: string) => {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("key", key);
+      if (key) formData.append("key", key);
 
-      const fallbackRes = await fetch("/api/upload", {
+      const fallbackRes = await fetch("/api/upload/fallback", {
         method: "POST",
         body: formData,
       });
 
-      return fallbackRes.ok;
+      if (!fallbackRes.ok) return null;
+      const fallbackData = await fallbackRes.json();
+      return {
+        key: typeof fallbackData.key === "string" ? fallbackData.key : null,
+        fileUrl:
+          typeof fallbackData.fileUrl === "string" ? fallbackData.fileUrl : null,
+      };
     };
 
     try {
@@ -197,6 +217,8 @@ export default function S3UploadCard() {
         typeof uploadData.uploadUrl === "string" ? uploadData.uploadUrl : null;
       const uploadedKey =
         typeof uploadData.key === "string" ? uploadData.key : null;
+      const uploadedFileUrl =
+        typeof uploadData.fileUrl === "string" ? uploadData.fileUrl : null;
 
       if (!uploadUrl || !uploadedKey) {
         setMessage("Upload failed");
@@ -216,8 +238,8 @@ export default function S3UploadCard() {
       }
 
       if (!uploadRes || !uploadRes.ok) {
-        const fallbackOk = await uploadViaServerFallback(uploadedKey);
-        if (!fallbackOk) {
+        const fallbackUpload = await uploadViaServerFallback(uploadedKey);
+        if (!fallbackUpload?.key) {
           setMessage("Upload failed");
           setMessageType("error");
           return;
@@ -229,33 +251,31 @@ export default function S3UploadCard() {
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
 
-      if (uploadedKey) setHasMoreImages(true);
+      if (uploadedKey && uploadedFileUrl) {
+        setImages((prev) => [
+          { key: uploadedKey, url: uploadedFileUrl },
+          ...prev.filter((image) => image.key !== uploadedKey),
+        ]);
+        return;
+      }
       fetchImages();
     } catch (err) {
       console.error("Upload failed", err);
       try {
-        const initRes = await fetch("/api/upload", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fileName: file.name,
-            fileType: file.type,
-            fileSize: file.size,
-          }),
-        });
-        const initData = await initRes.json();
-        const fallbackKey =
-          typeof initData.key === "string" ? initData.key : "";
-        if (!initRes.ok || !fallbackKey) throw new Error("No fallback key");
-
-        const fallbackOk = await uploadViaServerFallback(fallbackKey);
-        if (!fallbackOk) throw new Error("Fallback upload failed");
+        const fallbackUpload = await uploadViaServerFallback();
+        if (!fallbackUpload?.key) throw new Error("Fallback upload failed");
 
         setMessage("Upload complete");
         setMessageType("success");
         setFile(null);
         if (fileInputRef.current) fileInputRef.current.value = "";
-        setHasMoreImages(true);
+        if (fallbackUpload.fileUrl) {
+          setImages((prev) => [
+            { key: fallbackUpload.key, url: fallbackUpload.fileUrl },
+            ...prev.filter((image) => image.key !== fallbackUpload.key),
+          ]);
+          return;
+        }
         fetchImages();
       } catch (fallbackErr) {
         console.error("Fallback upload failed", fallbackErr);

@@ -1,27 +1,12 @@
-import { GetObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { ListObjectsV2Command } from "@aws-sdk/client-s3";
+import {
+  AWS_BUCKET_NAME,
+} from "@/lib/aws/config";
 import { s3 } from "@/lib/aws/s3";
+import { getDownloadUrlForKey } from "@/lib/uploads/service";
 
 const DEFAULT_LIMIT = 12;
 const MAX_LIMIT = 30;
-
-const encodeS3Key = (key: string) =>
-  key
-    .split("/")
-    .map((segment) => encodeURIComponent(segment))
-    .join("/");
-
-const getPublicUrlForKey = (key: string) => {
-  const cdnBaseUrl = process.env.AWS_S3_CDN_URL;
-  const encodedKey = encodeS3Key(key);
-
-  if (cdnBaseUrl) {
-    const normalizedBaseUrl = cdnBaseUrl.replace(/\/+$/, "");
-    return `${normalizedBaseUrl}/${encodedKey}`;
-  }
-
-  return null;
-};
 
 export async function GET(req: Request) {
   try {
@@ -32,7 +17,7 @@ export async function GET(req: Request) {
       ? Math.min(Math.max(1, Math.floor(rawLimit)), MAX_LIMIT)
       : DEFAULT_LIMIT;
 
-    const bucketName = process.env.AWS_BUCKET_NAME;
+    const bucketName = AWS_BUCKET_NAME;
     if (!bucketName) {
       return Response.json(
         { error: "Missing AWS bucket configuration" },
@@ -62,29 +47,23 @@ export async function GET(req: Request) {
         .map((item) => item.Key) || [];
     const fileItems = await Promise.all(
       files.map(async (key) => {
-        const publicUrl = getPublicUrlForKey(key);
-        if (publicUrl) {
-          return { key, url: publicUrl };
-        }
-
-        const signedUrl = await getSignedUrl(
-          s3,
-          new GetObjectCommand({
-            Bucket: bucketName,
-            Key: key,
-          }),
-          { expiresIn: 3600 },
-        );
-
-        return { key, url: signedUrl };
+        const url = await getDownloadUrlForKey(key);
+        return { key, url };
       }),
     );
 
-    return Response.json({
-      files: fileItems,
-      nextCursor: data.IsTruncated ? data.NextContinuationToken || null : null,
-      hasMore: Boolean(data.IsTruncated),
-    });
+    return Response.json(
+      {
+        files: fileItems,
+        nextCursor: data.IsTruncated ? data.NextContinuationToken || null : null,
+        hasMore: Boolean(data.IsTruncated),
+      },
+      {
+        headers: {
+          "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
+        },
+      },
+    );
   } catch (err) {
     console.error("Failed to list files", err);
     return Response.json({ error: "Failed to list files" }, { status: 500 });

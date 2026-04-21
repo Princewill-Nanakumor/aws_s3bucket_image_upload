@@ -1,4 +1,5 @@
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { AWS_BUCKET_NAME } from "@/lib/aws/config";
 import { s3 } from "@/lib/aws/s3";
 
 export async function DELETE(req: Request) {
@@ -9,8 +10,16 @@ export async function DELETE(req: Request) {
       return Response.json({ error: "Invalid file key" }, { status: 400 });
     }
 
+    const bucketName = AWS_BUCKET_NAME;
+    if (!bucketName) {
+      return Response.json(
+        { error: "Missing AWS bucket configuration" },
+        { status: 500 },
+      );
+    }
+
     const command = new DeleteObjectCommand({
-      Bucket: process.env.AWS_BUCKET_NAME,
+      Bucket: bucketName,
       Key: key,
     });
 

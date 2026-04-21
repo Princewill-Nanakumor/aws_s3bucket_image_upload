@@ -44,8 +44,9 @@ function GridImageTile({
         alt="Uploaded file"
         fill
         unoptimized
-        loading={isPriority ? "eager" : "lazy"}
-        fetchPriority={isPriority ? "high" : "auto"}
+        priority={isPriority}
+        loading={isPriority ? undefined : "lazy"}
+        fetchPriority={isPriority ? "high" : undefined}
         sizes="(max-width: 768px) 50vw, (max-width: 1024px) 170px, 220px"
         onLoad={() => setIsLoaded(true)}
         className={`object-cover transition-opacity duration-300 ${
@@ -106,7 +107,7 @@ export default function UploadedImagesGrid({
                 <GridImageTile
                   imageUrl={image.url}
                   index={index}
-                  isPriority={index < 4}
+                  isPriority={index < 8}
                   onPreviewImage={onPreviewImage}
                 />
                 <button
