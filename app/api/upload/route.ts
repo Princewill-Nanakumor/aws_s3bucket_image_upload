@@ -5,6 +5,7 @@ import {
   SIGNED_UPLOAD_EXPIRES_IN_SECONDS,
 } from "@/lib/aws/config";
 import { s3 } from "@/lib/aws/s3";
+import { requireAuth } from "@/lib/auth/require-auth";
 import {
   createUploadKey,
   getDownloadUrlForKey,
@@ -15,6 +16,9 @@ import {
 } from "@/lib/uploads/validation";
 
 export async function POST(req: Request) {
+  const authError = requireAuth(req);
+  if (authError) return authError;
+
   try {
     const { fileName, fileType, fileSize } = await req.json();
 

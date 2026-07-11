@@ -9,6 +9,7 @@ type UploadedImagesGridProps = {
   isLoadingMore: boolean;
   hasMore: boolean;
   deletingKey: string | null;
+  canDelete?: boolean;
   onRequestDelete: (key: string) => void;
   onPreviewImage: (index: number) => void;
   onLoadMore: () => void;
@@ -63,6 +64,7 @@ export default function UploadedImagesGrid({
   isLoadingMore,
   hasMore,
   deletingKey,
+  canDelete = false,
   onRequestDelete,
   onPreviewImage,
   onLoadMore,
@@ -110,32 +112,34 @@ export default function UploadedImagesGrid({
                   isPriority={index < 8}
                   onPreviewImage={onPreviewImage}
                 />
-                <button
-                  type="button"
-                  onClick={() => onRequestDelete(image.key)}
-                  disabled={deletingKey === image.key}
-                  aria-label="Delete image"
-                  className="absolute top-2 right-2 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-red-600 text-white shadow-md opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-700 focus:opacity-100 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {deletingKey === image.key ? (
-                    <span className="text-[10px] font-semibold">...</span>
-                  ) : (
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      className="h-4 w-4"
-                    >
-                      <path d="M3 6h18" />
-                      <path d="M8 6V4h8v2" />
-                      <path d="M19 6l-1 14H6L5 6" />
-                      <path d="M10 11v6" />
-                      <path d="M14 11v6" />
-                    </svg>
-                  )}
-                </button>
+                {canDelete ? (
+                  <button
+                    type="button"
+                    onClick={() => onRequestDelete(image.key)}
+                    disabled={deletingKey === image.key}
+                    aria-label="Delete image"
+                    className="absolute top-2 right-2 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-red-600 text-white shadow-md opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-700 focus:opacity-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {deletingKey === image.key ? (
+                      <span className="text-[10px] font-semibold">...</span>
+                    ) : (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        className="h-4 w-4"
+                      >
+                        <path d="M3 6h18" />
+                        <path d="M8 6V4h8v2" />
+                        <path d="M19 6l-1 14H6L5 6" />
+                        <path d="M10 11v6" />
+                        <path d="M14 11v6" />
+                      </svg>
+                    )}
+                  </button>
+                ) : null}
               </div>
             ))}
           </div>

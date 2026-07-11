@@ -1,8 +1,12 @@
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { AWS_BUCKET_NAME } from "@/lib/aws/config";
 import { s3 } from "@/lib/aws/s3";
+import { requireAuth } from "@/lib/auth/require-auth";
 
 export async function DELETE(req: Request) {
+  const authError = requireAuth(req);
+  if (authError) return authError;
+
   try {
     const { key } = await req.json();
 

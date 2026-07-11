@@ -1,16 +1,22 @@
 import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { fileTypeFromBuffer } from "file-type";
 import { AWS_BUCKET_NAME } from "@/lib/aws/config";
 import { s3 } from "@/lib/aws/s3";
+import { requireAuth } from "@/lib/auth/require-auth";
 import {
   createUploadKey,
   getDownloadUrlForKey,
 } from "@/lib/uploads/service";
 import {
+  ALLOWED_EXTENSIONS,
   MAX_FILE_SIZE_BYTES,
   isAllowedImageUpload,
 } from "@/lib/uploads/validation";
 
 export async function POST(req: Request) {
+  const authError = requireAuth(req);
+  if (authError) return authError;
+
   try {
     const formData = await req.formData();
     const file = formData.get("file");
@@ -45,12 +51,24 @@ export async function POST(req: Request) {
         : createUploadKey(file.name);
 
     const buffer = Buffer.from(await file.arrayBuffer());
+    const detectedType = await fileTypeFromBuffer(buffer);
+    if (
+      !detectedType ||
+      !detectedType.mime.startsWith("image/") ||
+      !ALLOWED_EXTENSIONS.has(detectedType.ext)
+    ) {
+      return Response.json(
+        { error: "File content is not a valid supported image" },
+        { status: 400 },
+      );
+    }
+
     await s3.send(
       new PutObjectCommand({
         Bucket: bucketName,
         Key: key,
         Body: buffer,
-        ContentType: file.type,
+        ContentType: detectedType.mime,
       }),
     );
 

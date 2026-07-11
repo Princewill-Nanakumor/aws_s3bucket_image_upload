@@ -7,6 +7,7 @@ import UploadedImagesGrid from "@/components/UploadedImagesGrid";
 import ConfirmDeleteModal from "@/components/ConfirmDeleteModal";
 import Toast from "@/components/Toast";
 import ImagePreviewModal from "@/components/ImagePreviewModal";
+import PasswordGate from "@/components/PasswordGate";
 import {
   MAX_FILE_SIZE_BYTES,
   isAllowedImageUpload,
@@ -15,6 +16,7 @@ import {
 export default function S3UploadCard() {
   type UploadedImage = { key: string; url: string };
   const PAGE_SIZE = 12;
+  const [authenticated, setAuthenticated] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -32,6 +34,10 @@ export default function S3UploadCard() {
   const [toastType, setToastType] = useState<"success" | "error">("success");
   const [previewImageIndex, setPreviewImageIndex] = useState<number | null>(null);
   const fetchImagesRequestIdRef = useRef(0);
+
+  const handleAuthenticated = useCallback(() => {
+    setAuthenticated(true);
+  }, []);
 
   useEffect(() => {
     if (!file) {
@@ -155,6 +161,12 @@ export default function S3UploadCard() {
   };
 
   const handleUpload = async () => {
+    if (!authenticated) {
+      setMessage("Enter the access password to upload");
+      setMessageType("error");
+      return;
+    }
+
     if (!file) {
       setMessage("Please select a file");
       setMessageType("error");
@@ -184,6 +196,7 @@ export default function S3UploadCard() {
       const fallbackRes = await fetch("/api/upload/fallback", {
         method: "POST",
         body: formData,
+        credentials: "include",
       });
 
       if (!fallbackRes.ok) return null;
@@ -198,6 +211,7 @@ export default function S3UploadCard() {
     try {
       const initRes = await fetch("/api/upload", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fileName: file.name,
@@ -288,10 +302,13 @@ export default function S3UploadCard() {
   };
 
   const handleDelete = async (key: string) => {
+    if (!authenticated) return;
+
     setDeletingKey(key);
     try {
       const res = await fetch("/api/delete", {
         method: "DELETE",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key }),
       });
@@ -315,6 +332,7 @@ export default function S3UploadCard() {
   };
 
   const handleRequestDelete = (key: string) => {
+    if (!authenticated) return;
     setConfirmDeleteKey(key);
   };
 
@@ -371,27 +389,34 @@ export default function S3UploadCard() {
         <section className="bg-linear-to-br from-white/92 via-blue-100/80 to-indigo-100/80 backdrop-blur-md shadow-xl rounded-3xl border border-indigo-100/80 p-8 w-full md:max-w-md relative">
           <div className="pointer-events-none absolute inset-0 rounded-3xl border-2 border-transparent bg-linear-to-r from-fuchsia-300/70 via-sky-300/70 to-indigo-300/70 opacity-70 [mask:linear-gradient(#fff_0_0)_padding-box,linear-gradient(#fff_0_0)] mask-exclude [-webkit-mask:linear-gradient(#fff_0_0)_padding-box,linear-gradient(#fff_0_0)] [-webkit-mask-composite:xor]" />
           <div className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-indigo-300/45" />
-          <h1 className="font-display text-3xl font-semibold mb-6 text-center text-slate-800">
-            Upload File to S3
-          </h1>
 
-          <UploadDropzone
-            file={file}
-            preview={preview}
-            fileInputRef={fileInputRef}
-            onRemove={handleRemove}
-            onFileSelect={setFile}
-          />
+          {authenticated ? (
+            <>
+              <h1 className="font-display text-3xl font-semibold mb-6 text-center text-slate-800">
+                Upload File to S3
+              </h1>
 
-          <button
-            onClick={handleUpload}
-            disabled={loading || !file}
-            className="mt-6 w-full bg-linear-to-r from-slate-900 to-slate-700 text-white py-2.5 rounded-xl hover:from-slate-800 hover:to-slate-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-md transition"
-          >
-            {loading ? "Uploading..." : "Upload"}
-          </button>
+              <UploadDropzone
+                file={file}
+                preview={preview}
+                fileInputRef={fileInputRef}
+                onRemove={handleRemove}
+                onFileSelect={setFile}
+              />
 
-          <StatusMessage message={message} type={messageType} />
+              <button
+                onClick={handleUpload}
+                disabled={loading || !file}
+                className="mt-6 w-full bg-linear-to-r from-slate-900 to-slate-700 text-white py-2.5 rounded-xl hover:from-slate-800 hover:to-slate-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-md transition"
+              >
+                {loading ? "Uploading..." : "Upload"}
+              </button>
+
+              <StatusMessage message={message} type={messageType} />
+            </>
+          ) : (
+            <PasswordGate onAuthenticated={handleAuthenticated} />
+          )}
         </section>
 
         <UploadedImagesGrid
@@ -400,6 +425,7 @@ export default function S3UploadCard() {
           isLoadingMore={isLoadingMoreImages}
           hasMore={hasMoreImages}
           deletingKey={deletingKey}
+          canDelete={authenticated}
           onRequestDelete={handleRequestDelete}
           onPreviewImage={handlePreviewImage}
           onLoadMore={handleLoadMoreImages}

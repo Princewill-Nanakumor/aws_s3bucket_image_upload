@@ -1,6 +1,10 @@
+import { requireAuth } from "@/lib/auth/require-auth";
 import { getDownloadUrlForKey } from "@/lib/uploads/service";
 
 export async function POST(req: Request) {
+  const authError = requireAuth(req);
+  if (authError) return authError;
+
   try {
     const { key } = await req.json();
     if (!key || typeof key !== "string" || !key.startsWith("uploads/")) {
