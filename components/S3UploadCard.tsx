@@ -451,6 +451,25 @@ export default function S3UploadCard() {
           type={toastType}
         />
       </div>
+      <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap text-xs font-medium text-slate-600">
+        <a
+          href="https://princewillnanakumor.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="transition hover:text-indigo-700 hover:underline"
+        >
+          Built by Nanakumor Princewill
+        </a>
+        <span aria-hidden="true">·</span>
+        <a
+          href="https://princewillnanakumor.com/blog/building-a-production-ready-aws-s3-image-upload-system-with-next-js-16-and-typescript"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="transition hover:text-indigo-700 hover:underline"
+        >
+          Read how it was built
+        </a>
+      </div>
     </main>
   );
 }
